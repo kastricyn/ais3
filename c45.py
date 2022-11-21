@@ -3,29 +3,29 @@ import pandas as pd
 
 
 # кол-во элементов (строк) : data[col] == value
-def freq(data: pd.DataFrame, col: str, value):
-    return len(data[(data[col] == value)])
+def freq(data: pd.DataFrame, feature: str | int, value):
+    return len(data[(data[feature] == value)])
 
 
-def info(data: pd.DataFrame, res_col):
+def info(data: pd.DataFrame, feature_res: str | int):
     s = 0  # sum
-    for v in set(data[res_col]):  # по всем уникальным значениям в столбце
-        p = freq(data, res_col, v) / len(data[res_col])
+    for v in set(data[feature_res]):  # по всем уникальным значениям в столбце
+        p = freq(data, feature_res, v) / len(data[feature_res])
         s += p * math.log(p, 2)
     return -s
 
 
-def infox(data: pd.DataFrame, col, res_col):
+def info_feature(data: pd.DataFrame, feature: str | int, feature_res: str | int):
     s = 0  # sum
-    for v in set(data[col]):  # по всем уникальным значениям в столбце
-        data_i = data[(data[col] == v)]
-        s += len(data_i) / len(data) * info(data_i, res_col)
+    for v in set(data[feature]):  # по всем уникальным значениям в столбце
+        data_i = data[(data[feature] == v)]
+        s += len(data_i) / len(data) * info(data_i, feature_res)
     return s
 
 
-def split_info(data: pd.DataFrame, col):
-    return info(data, col)
+def split_info(data: pd.DataFrame, feature: str | int):
+    return info(data, feature)
 
 
-def gain_ratio(data: pd.DataFrame, x, res_col):
-    return (info(data, res_col) - infox(data, x, res_col)) / split_info(data, x)
+def gain_ratio(data: pd.DataFrame, feature: str | int, feature_res: str | int):
+    return (info(data, feature_res) - info_feature(data, feature, feature_res)) / split_info(data, feature)

@@ -3,66 +3,88 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import random
 
+import c45
+
 
 class Tree:
-    def __init__(self, data_path: str):
+
+    def __init__(self):
+        self.tree = dict()
+        self.epsilon = 0.03
+        # self.x_train: pd.DataFrame = None
+        # self.y_train: pd.DataFrame = None
+        # self.x_test: pd.DataFrame = None
+        # self.y_test: pd.DataFrame = None
+
+    def data_load(self, data_path: str, args=None):
+        if args is None:
+            args = {}
+        args.setdefault('random_seed_feature_names', 0)
+        args.setdefault('random_state_split', 12)
+        args.setdefault('test_size', 0.2)
+
         data = pd.read_csv(data_path, sep=';')
-        data[data['GRADE'] < 4] = 0
-        data[data['GRADE'] > 0] = 1
+        data.loc[data['GRADE'] < 4, 'GRADE'] = 0
+        data.loc[data['GRADE'] > 0, 'GRADE'] = 1
         data = data.rename(columns={'GRADE': 'SUCCESSFUL'})
-        columns = random.sample(list(data.columns[1:-1]), int(len(data) ** 0.5))
-        data_x = data[columns]
-        data_y = data['SUCCESSFUL']
-        self.x_train, x_test, self.y_train, y_test = train_test_split(data_x, data_y, test_size=0.2, random_state=12)
-        self.tree = {}
+        random.seed(args['random_seed_feature_names'])
+        self.feature_names = random.sample(list(data.columns[1:-1]), int(len(data) ** 0.5))
+        self.feature_result_name = 'SUCCESSFUL'
+        self.data = data
+        # data_x = data[self.feature_names]
+        # data_y = data['SUCCESSFUL']
+        # self.data_train, self.data_test, \
+        # self.x_train, self.x_test, \
+        # self.y_train, self.y_test = train_test_split(data,
+        #                                              data_x,
+        #                                              data_y,
+        #                                              test_size=args['test_size'], random_state=args['random_state_split'])
 
-    def train(self):
-        x = self.x_train
-        y = self.y_train
+    def test(self):
+        # data = self.data
+        # print(f"{data.shape[0]}")
+        # print(data['3'].unique())
+        # data = data[data[self.feature_result_name] == 1]
+        # print(data)
+        # print(data)
+        self.train(self.data, self.feature_names, self.feature_result_name)
+        print(self.tree)
 
-        if len(set(y)) == 1:
-            return y[0]
+    def train(self, data: pd.DataFrame, feature_names: list[str], feature_result_name: str):
+        label = data[feature_result_name].mode()[0]
 
-        label_1, label_2 = set(y)
-        max_label = label_1 if np.sum(y == label_1) > np.sum(y == label_2) else label_2
-        # print("max_label", max_label)
+        if len(feature_names) == 0 or data[feature_result_name].nunique() == 1:
+            return label
 
-        if len(x[0]) == 0:
-            return max_label
-        if depth > self.depth:
-            return max_label
+        def get_best_feature() -> tuple[str, float]:
+            feature_best = feature_names[0]
+            max_gain = -1
+            for feature_current in feature_names:
+                gain = c45.gain_ratio(data, feature_current, feature_result_name)
+                if max_gain < gain:
+                    max_gain = gain
+                    feature_best = feature_current
+            return feature_best, max_gain
 
-        if len(y) < self.min_leaf_size:
-            return max_label
-
-        best_feature_index = 0
-        max_gain = 0
-        for feature_index in range(len(X[0])):
-            gain = self.information_gain(X[:, feature_index], y)
-            if max_gain < gain:
-                max_gain = gain
-                best_feature_index = feature_index
-
-        # print(max_gain)
-
-        if max_gain < self.eps:
-            return max_label
+        try:
+            best_feature, gain = get_best_feature()
+        except ZeroDivisionError:
+            return label
 
         T = {}
         sub_T = {}
-        for best_feature in set(X[:, best_feature_index]):
-            '''
-            best_feature：某个特征下的特征类别
-            '''
-            sub_y = y[X[:, best_feature_index] == best_feature]
-            sub_X = X[X[:, best_feature_index] == best_feature]
-            sub_X = np.delete(sub_X, best_feature_index, 1)  # 删除最佳特征列
+        for value_of_best_feature in data[best_feature].unique():
+            sub_data = data.loc[data[best_feature] == value_of_best_feature]
+            sub_feature_names = feature_names.copy()
+            sub_feature_names.remove(best_feature)
 
-            sub_T[best_feature + "___" + str(len(sub_X))] = self._built_tree(sub_X, sub_y, depth + 1)  # 关键代码
+            sub_T[f"{best_feature}-{value_of_best_feature}-{data.shape[0]}"] = self.train(sub_data, sub_feature_names,
+                                                                                          feature_result_name)
 
-        T[self.feature_names[best_feature_index] + "___" + str(len(X))] = sub_T  # 关键代码
+        T[f"{best_feature}-{value_of_best_feature}-{data.shape[0]}"] = sub_T
 
         self.tree = T
+        return T
 
     def predict(self, x, tree=None):
         if x.ndim == 2:
@@ -92,7 +114,3 @@ class Tree:
             return self.predict(x, x_tree)
         else:
             return x_tree
-
-    def test(self):
-        pass
-
