@@ -41,14 +41,12 @@ class Tree:
         #                                              test_size=args['test_size'], random_state=args['random_state_split'])
 
     def test(self):
-        # data = self.data
-        # print(f"{data.shape[0]}")
-        # print(data['3'].unique())
-        # data = data[data[self.feature_result_name] == 1]
-        # print(data)
-        # print(data)
+        # print(self.data)
         self.train(self.data, self.feature_names, self.feature_result_name)
-        print(self.tree)
+        predict = self.predict(self.data)
+        print(predict)
+        self.data['predict_class'] = predict
+        print(self.data)
 
     def train(self, data: pd.DataFrame, feature_names: list[str], feature_result_name: str):
         label = data[feature_result_name].mode()[0]
@@ -72,45 +70,36 @@ class Tree:
             return label
 
         T = {}
-        sub_T = {}
+        # sub_T = {}
         for value_of_best_feature in data[best_feature].unique():
             sub_data = data.loc[data[best_feature] == value_of_best_feature]
             sub_feature_names = feature_names.copy()
             sub_feature_names.remove(best_feature)
 
-            sub_T[f"{best_feature}-{value_of_best_feature}-{data.shape[0]}"] = self.train(sub_data, sub_feature_names,
-                                                                                          feature_result_name)
+            T[f"{best_feature}-{value_of_best_feature}-{data.shape[0]}"] = self.train(sub_data, sub_feature_names,
+                                                                                      feature_result_name)
 
-        T[f"{best_feature}-{value_of_best_feature}-{data.shape[0]}"] = sub_T
+        # T[f"{best_feature}-{data.shape[0]}"] = sub_T
 
         self.tree = T
         return T
 
-    def predict(self, x, tree=None):
-        if x.ndim == 2:
-            res = []
-            for x_ in x:
-                res.append(self.predict(x_))
-            return res
-
-        if not tree:
+    def predict(self, data: pd.DataFrame, tree=None) -> list:
+        if tree is None:
             tree = self.tree
-
-        tree_key = list(tree.keys())[0]
-
-        x_feature = tree_key.split("___")[0]
-
-        try:
-            x_index = self.feature_names.index(x_feature)  # 从列表中定位索引
-        except ValueError:
-            return '?'
-        x_tree = tree[tree_key]
-        for key in x_tree.keys():
-            if key.split("___")[0] == x[x_index]:
-                tree_key = key
-                x_tree = x_tree[tree_key]
-
-        if type(x_tree) == dict:
-            return self.predict(x, x_tree)
-        else:
-            return x_tree
+        result = []
+        data = data.reset_index()
+        for index, row in data.iterrows():
+            def getResultForRow(tree=None):
+                feature = list(tree.keys())[0].split("-")[0]
+                for key in tree:
+                    if str(key).startswith(f"{feature}-{row[feature]}"):
+                        if isinstance(tree[key], dict):
+                            getResultForRow(tree[key])
+                        else:
+                            result.append(tree[key])
+                        break
+                else:
+                    result.append('?')
+            getResultForRow(tree)
+        return result
