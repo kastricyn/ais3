@@ -1,7 +1,7 @@
-import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_curve, RocCurveDisplay, \
+    precision_recall_curve, PrecisionRecallDisplay, auc, average_precision_score
+import matplotlib.pyplot as plt
 import pandas as pd
-import random
 
 import c45
 
@@ -11,34 +11,6 @@ class Tree:
     def __init__(self):
         self.tree = dict()
         self.epsilon = 0.03
-        # self.x_train: pd.DataFrame = None
-        # self.y_train: pd.DataFrame = None
-        # self.x_test: pd.DataFrame = None
-        # self.y_test: pd.DataFrame = None
-
-    def data_load(self, data_path: str, args=None):
-        if args is None:
-            args = {}
-        args.setdefault('random_seed_feature_names', 0)
-        args.setdefault('random_state_split', 12)
-        args.setdefault('test_size', 0.2)
-
-        data = pd.read_csv(data_path, sep=';')
-        data.loc[data['GRADE'] < 4, 'GRADE'] = 0
-        data.loc[data['GRADE'] > 0, 'GRADE'] = 1
-        data = data.rename(columns={'GRADE': 'SUCCESSFUL'})
-        random.seed(args['random_seed_feature_names'])
-        self.feature_names = random.sample(list(data.columns[1:-1]), int(len(data) ** 0.5))
-        self.feature_result_name = 'SUCCESSFUL'
-        self.data = data
-        # data_x = data[self.feature_names]
-        # data_y = data['SUCCESSFUL']
-        # self.data_train, self.data_test, \
-        # self.x_train, self.x_test, \
-        # self.y_train, self.y_test = train_test_split(data,
-        #                                              data_x,
-        #                                              data_y,
-        #                                              test_size=args['test_size'], random_state=args['random_state_split'])
 
     def test(self):
         # print(self.data)
@@ -70,7 +42,6 @@ class Tree:
             return label
 
         T = {}
-        # sub_T = {}
         for value_of_best_feature in data[best_feature].unique():
             sub_data = data.loc[data[best_feature] == value_of_best_feature]
             sub_feature_names = feature_names.copy()
@@ -78,8 +49,6 @@ class Tree:
 
             T[f"{best_feature}-{value_of_best_feature}-{data.shape[0]}"] = self.train(sub_data, sub_feature_names,
                                                                                       feature_result_name)
-
-        # T[f"{best_feature}-{data.shape[0]}"] = sub_T
 
         self.tree = T
         return T
@@ -100,6 +69,28 @@ class Tree:
                             result.append(tree[key])
                         break
                 else:
-                    result.append('?')
+                    result.append(-1)
+
             getResultForRow(tree)
         return result
+
+
+class Metrics:
+    @classmethod
+    def print_metrics(cls, data_predicted: list, data_expect: list):
+        print("accuracy_score:", accuracy_score(data_expect, data_predicted))
+        print("precision_score:", precision_score(data_expect, data_predicted, average='macro', zero_division=0))
+        print("recall_score:", recall_score(data_expect, data_predicted, average='macro'))
+
+    @classmethod
+    def draw_plt(cls, data_predict, data_expect):
+        fpr, tpr, _ = roc_curve(data_predict, data_expect)
+        roc_display = RocCurveDisplay(fpr=fpr, tpr=tpr).plot()
+        precision, recall, _ = precision_recall_curve(data_predict, data_expect)
+        pr_display = PrecisionRecallDisplay(precision=precision, recall=recall).plot()
+        auc_roc = auc(fpr, tpr)
+        auc_pr = average_precision_score(data_predict, data_expect)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8))
+        roc_display.plot(ax=ax1)
+        pr_display.plot(ax=ax2)
+        plt.show()
